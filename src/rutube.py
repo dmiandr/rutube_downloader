@@ -20,6 +20,9 @@ RETRY = 5
 DATA_URL_TEMPLATE = r'https://rutube.ru/api/play/options/{}/?no_404=true&referer=https%253A%252F%252Frutube.ru&pver=v2'
 YAPPY_URL_TEMPLATE = r'https://rutube.ru/pangolin/api/web/yappy/yappypage/?client=wdp&source=shorts&videoId={}'
 
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+}
 
 class VideoType(enum.Enum):
     VIDEO = 'video'
@@ -97,9 +100,9 @@ class RutubeVideo(VideoAbstract):
         if self._segment_urls:
             return self._segment_urls
 
-        r = requests.get(self._base_path)
+        r = requests.get(self._base_path, headers=HEADERS)
         if r.status_code != 200:
-            r = requests.get(self._reserve_path)
+            r = requests.get(self._reserve_path, headers=HEADERS)
             if r.status_code != 200:
                 raise Exception(f'Cannot get segments. Status code: {r.status_code}')
 
@@ -120,7 +123,7 @@ class RutubeVideo(VideoAbstract):
         r = None
         retry = RETRY
         while retry:
-            r = requests.get(uri)
+            r = requests.get(uri, headers=HEADERS)
             if r.status_code == 200:
                 return r
             retry -= 1
@@ -195,7 +198,7 @@ class YappyVideo(VideoAbstract):
 
     def _write(self, stream: Optional[BinaryIO] = None, *args, **kwargs):
         with alive_bar(2, title=self.title) as bar:
-            r = requests.get(self._link)
+            r = requests.get(self._link, headers=HEADERS)
             if r.status_code != 200:
                 raise Exception(f'Error code: {r and r.status_code}')
             bar()
@@ -267,7 +270,7 @@ class YappyPlaylist(BasePlaylist):
         self._playlist = [YappyVideo(self._video_id, self._get_video_link())]
 
     def _get_videos(self) -> list:
-        r = requests.get(YAPPY_URL_TEMPLATE.format(self._video_id))
+        r = requests.get(YAPPY_URL_TEMPLATE.format(self._video_id), headers=HEADERS)
         if r.status_code != 200:
             raise Exception(f'Error code: {r and r.status_code}')
 
@@ -346,11 +349,11 @@ class Rutube:
         return result[0]
 
     def _get_data(self):
-        r = requests.get(self._data_url)
+        r = requests.get(self._data_url, headers=HEADERS)
         return json.loads(r.content)
 
     def _check_url(self):
-        if requests.get(self._video_url).status_code != 200:
+        if requests.get(self._video_url, headers=HEADERS).status_code != 200:
             raise Exception(f'{self._video_url} is unavailable')
         return True
 
@@ -395,5 +398,5 @@ class Rutube:
         return self._data['video_balancer']['m3u8']
 
     def _get_m3u8_data(self):
-        r = requests.get(self._m3u8_url)
+        r = requests.get(self._m3u8_url, headers=HEADERS)
         return m3u8.loads(r.text)
